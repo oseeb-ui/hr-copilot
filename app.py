@@ -8,6 +8,33 @@ load_dotenv()
 
 st.set_page_config(page_title="HR Recruiter Copilot", layout="wide")
 
+# --- Monetization & Session State ---
+PRO_PASSCODE = "HIRINGPRO2026"  # The secret passcode given to paying customers
+
+if "scans_used" not in st.session_state:
+    st.session_state.scans_used = 0
+
+# Sidebar: Membership / Pro Status
+with st.sidebar:
+    st.header("🔑 Membership Status")
+    user_passcode = st.text_input("Enter Pro Passcode", type="password")
+    
+    is_pro = (user_passcode.strip() == PRO_PASSCODE)
+    
+    if is_pro:
+        st.success("✨ Pro Active: Unlimited Scans Unlocked")
+    else:
+        free_remaining = max(0, 1 - st.session_state.scans_used)
+        st.info(f"Free Scans Remaining: **{free_remaining}/1**")
+        if free_remaining == 0:
+            st.warning("⚠️ Free scan limit reached.")
+            st.markdown(
+                """
+                **Want unlimited candidate reports?**  
+                👉 [Get Pro Passcode ($5/month)](https://buy.stripe.com/test_placeholder)
+                """
+            )
+
 st.title("🎯 HR Recruiter Copilot (AI-Powered)")
 st.caption("Recruiter-level ATS analysis, tailored cold outreach, and interview question preparation.")
 
@@ -38,11 +65,18 @@ with col2:
 
 st.divider()
 
+# Lock logic: Block if not pro and used >= 1 scan
+is_locked = (not is_pro) and (st.session_state.scans_used >= 1)
+
+if is_locked:
+    st.error("🔒 You have used your 1 free evaluation. Enter your Pro Passcode in the sidebar to run more candidate reports.")
+    st.stop()
+
 if st.button("Generate Complete Candidate Report", type="primary", use_container_width=True):
     if not job_description or not resume_text:
         st.warning("Please provide both a job description and a resume.")
     elif not client:
-        st.error("Missing Gemini API Key. Please verify GEMINI_API_KEY in your .env file.")
+        st.error("Missing Gemini API Key. Please verify GEMINI_API_KEY.")
     else:
         prompt = f"""
 You are a Senior Corporate Recruiter and Talent Acquisition Lead.
@@ -79,6 +113,9 @@ Provide a structured evaluation in Markdown with the following 4 sections:
                         report_placeholder.markdown(full_response + "▌")
 
                 report_placeholder.markdown(full_response)
+
+            # Deduct scan credit
+            st.session_state.scans_used += 1
 
             # --- Export & Action Buttons Section ---
             st.divider()
